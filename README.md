@@ -1,2 +1,2 @@
-# microbiome16S
-Repository for analysis code
+# microbiome-16S
+

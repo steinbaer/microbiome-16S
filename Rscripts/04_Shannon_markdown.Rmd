@@ -1,0 +1,999 @@
+---
+title: "alpha Diversity in CF infants and respiratory symptoms"
+author: "Ruth Steinberg"
+date: "27 11 2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+
+library(phyloseq)
+library(Biostrings)
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(lubridate)
+library(readxl)
+library(tidyr)
+library(tidyverse)
+library(mgcv)
+library(Maaslin2)
+
+
+load("C:/Users/ruths/Documents/PhD Bern/Data/PhD Bern/Microbiome/Microbiome Project Kat/R/Rfiles/20221026alldata.RData")
+
+```
+
+# 1. Is alpha Diversity in CF different compared to healthy?
+
+a) Shannon Diversity
+
+```{r gamm Shannon ~ CF,echo=FALSE}
+#get a feeling
+summary(data_new$Shannon)
+summary(data_CF$Shannon)
+sd(data_CF$Shannon)
+summary(data_healthy$Shannon)
+sd(data_healthy$Shannon)
+
+gamm.mod_Shannon <- gamm(Shannon ~ CF +
+                           s(ns_week, bs="cr",fx=FALSE)+
+                           as.factor(season)+
+                           as.factor(bf_atswab)+
+                           as.factor(ab_atswab)+
+                           as.factor(patPersSex)+
+                           as.factor(ag_sectio_n)+
+                           as.factor(anf_sibshome),
+                    family=gaussian,correlation=corAR1(form=~1|uid),data=data_new,na.action=na.omit)
+summary(gamm.mod_Shannon$gam)
+summary(gamm.mod_Shannon$lme)
+intervals(gamm.mod_Shannon$lme,which = "fixed")
+data_new$fitShannon<-predict(gamm.mod_Shannon$gam)
+
+```
+
+```{r plot Shannon, echo=FALSE, message=FALSE}
+ggplot(data_new,aes(x=ns_week,y=fitShannon,colour=CF))+geom_smooth()+theme_bw()+labs(x="Week after birth",y="SDI_fitted")
+
+```
+
+**Shannon Diversity is higher in infants with CF.**
+
+b) Shannon only never antibiotics in first year of life
+
+Of all CF infants only 17 had never antibiotic treatment. Of the 17 with "never" antibiotics, overall 3 reported often severe symptoms.
+
+```{r gamm Shannon ~ CF never ab,echo=FALSE}
+gamm.mod_Shannon <- gamm(Shannon ~ CF +
+                           s(ns_week, bs="cr",fx=FALSE)+
+                           as.factor(season)+
+                           as.factor(bf_atswab)+
+                           as.factor(patPersSex)+
+                           as.factor(ag_sectio_n)+
+                           as.factor(anf_sibshome),
+                    family=gaussian,correlation=corAR1(form=~1|uid),data=data_new_noab,na.action=na.omit)
+summary(gamm.mod_Shannon$gam)
+data_new_noab$fitShannon<-predict(gamm.mod_Shannon$gam)
+
+```
+
+
+```{r plot Shannon never ab, echo=FALSE, message=FALSE}
+ggplot(data_new_noab,aes(x=ns_week,y=fitShannon,colour=CF))+geom_smooth()+theme_bw()+labs(x="Week after birth",y="SDI_fitted",title="Infants without antibiotic treatment")
+ggplot(data_new_noab,aes(x=ns_week,y=fitShannon,colour=sev_freq))+facet_wrap(~CF)+geom_smooth()+theme_bw()+labs(x="Week after birth",y="SDI_fitted",title="Infants without antibiotic treatment",col="Severe Symptoms")
+```
+
+
+c) Antibiotic naive swabs
+
+```{r gamm Shannon ~ CF ab naive,echo=FALSE}
+
+data_CF_naive<-data_new_abnaive %>% filter(CF=="CF")
+summary(data_CF_naive$Shannon)
+data_healthy_naive<-data_new_abnaive %>% filter(CF=="Healthy")
+summary(data_healthy_naive$Shannon)
+gamm.mod_Shannon <- gamm(Shannon ~ CF +
+                           s(ns_week, bs="cr",fx=FALSE)+
+                           as.factor(season)+
+                           as.factor(bf_atswab)+
+                           as.factor(patPersSex)+
+                           as.factor(ag_sectio_n)+
+                           as.factor(anf_sibshome),
+                    family=gaussian,correlation=corAR1(form=~1|uid),data=data_new_abnaive,na.action=na.omit)
+summary(gamm.mod_Shannon$gam)
+intervals(gamm.mod_Shannon$lme,which = "fixed")
+data_new_abnaive$fitShannon<-predict(gamm.mod_Shannon$gam)
+
+```
+
+```{r plot Shannon ab naive, echo=FALSE, message=FALSE}
+ggplot(data_new_abnaive,aes(x=ns_week,y=fitShannon,colour=CF))+geom_smooth()+theme_bw()+labs(x="Week after birth",y="SDI_fitted",title="Before first antibiotic treatment")
+ggplot(data_new_abnaive,aes(x=ns_week,y=fitShannon,colour=sev_freq))+facet_wrap(~CF)+geom_smooth()+geom_point(alpha=0.1)+theme_bw()+labs(x="Week after birth",y="SDI_fitted",colour="Severe Symptoms",title="Before first antibiotic treatment")
+ggplot(data_new_abnaive,aes(x=ns_week,y=fitShannon,colour=symptom_freq))+facet_wrap(~CF)+geom_smooth()+geom_point(alpha=0.1)+theme_bw()+labs(x="Week after birth",y="SDI_fitted",colour="Respiratory Symptoms",title="Before first antibiotic treatment")
+
+
+```
+
+d) SDI CF vs healthy before first symptoms?
+```{r gamm Shannon ~ CF before symptoms, echo=FALSE}
+
+data_new_before<-data_new_sevsymptoms %>% 
+  filter(era_sevsymptom=="Before")
+data_beforesev_CF<-data_new_beforesev %>% 
+  filter(CF=="CF")
+summary(data_beforesev_CF$Shannon)
+data_beforesev_Healthy<-data_new_beforesev %>% 
+  filter(CF=="Healthy")
+summary(data_beforesev_Healthy$Shannon)
+gamm.mod_Shannon <- gamm(Shannon ~ CF +
+                           s(ns_week, bs="cr",fx=FALSE)+
+                           as.factor(season)+
+                           as.factor(bf_atswab)+
+                           as.factor(patPersSex)+
+                           as.factor(ag_sectio_n)+
+                           as.factor(anf_sibshome),
+                    family=gaussian,correlation=corAR1(form=~1|uid),data=data_new_before,na.action=na.omit)
+summary(gamm.mod_Shannon$gam)
+intervals(gamm.mod_Shannon$lme,which = "fixed")
+data_new_abnaive$fitShannon<-predict(gamm.mod_Shannon$gam)
+
+```
+
+
+e) SDI CF vs healthy after first LRTI?
+```{r gamm Shannon ~ CF after symptoms, echo=FALSE}
+
+data_new_after<-data_new_sevsymptoms %>% 
+  filter(era_sevsymptom=="After"&Subject%in%data_new_abnaive$Subject)
+
+gamm.mod_Shannon <- gamm(Shannon ~ CF +
+                           s(ns_week, bs="cr",fx=FALSE)+
+                           as.factor(season)+
+                           as.factor(bf_atswab)+
+                           as.factor(patPersSex)+
+                           as.factor(ag_sectio_n)+
+                           as.factor(anf_sibshome),
+                    family=gaussian,correlation=corAR1(form=~1|uid),data=data_new_after,na.action=na.omit)
+summary(gamm.mod_Shannon$gam)
+intervals(gamm.mod_Shannon$lme,which = "fixed")
+data_new_abnaive$fitShannon<-predict(gamm.mod_Shannon$gam)
+
+```
+
+
+# 2. The role of frequency of symptomatic episodes in first year of life
+## 2.1. Infants with CF
+## 2.1.1. Shannon Diversity
+
+a) Influence of frequency of any symptoms on Shannon
+
+```{r gamm Shannon symptom frequency CF , echo= FALSE}
+
+gamm.mod_Shannon_freq <- gamm(Shannon ~ symptom_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(patPersSex)+
+                              #SweatClBaby+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF,na.action=na.omit)
+
+summary(gamm.mod_Shannon_freq$gam)
+data_CF$fitShannon<-predict(gamm.mod_Shannon_freq$gam)
+
+```
+
+**CF Infants with many infections have lower SDI.**
+
+
+```{r plot Shannon symptom frequency CF, echo=FALSE, message=FALSE}
+
+ggplot(data_CF, aes(x=ns_week, y=fitShannon, col=symptom_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="Resp. Symptoms")
+
+```
+
+b) Influence of severe symptom frequency?
+
+```{r gamm Shannon severe symptom frequency CF , echo= FALSE}
+
+gamm.mod_Shannon_CF <- gamm(Shannon ~ sev_frequency +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF,na.action=na.omit)
+
+summary(gamm.mod_Shannon_CF$gam)
+
+
+```
+
+
+```{r plot Shannon severe symptom frequency CF, echo=FALSE, message=FALSE}
+
+ggplot(data_CF, aes(x=ns_week, y=fitShannon, col=sev_frequency)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="Severe Symptoms")
+
+```
+
+Combining often+sometimes und never+rarely
+
+```{r gamm Shannon severe symptom freq CF , echo= FALSE}
+
+###1 unadjusted model
+library(nlme)
+lme_sev<-lme(Shannon~sev_freq, random= ~ns_week|uid,data = data_CF)
+anova(lme_sev)
+summary(lme_sev)
+intervals(lme_sev)
+summary(glm(Shannon~sev_freq,data=data_CF))
+
+###Means for Shannon
+data_CF_often<-data_CF %>% 
+  filter(sev_freq=="often")
+summary(data_CF_often$Shannon)
+
+data_cf_normal<-data_CF %>% 
+  filter(sev_freq=="normal")
+summary(data_cf_normal$Shannon)
+
+gamm.mod_Shannon_sevfreq <- gamm(Shannon ~ sev_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF,na.action=na.omit)
+
+summary(gamm.mod_Shannon_sevfreq$gam)
+intervals(gamm.mod_Shannon_sevfreq$lme,which = "fixed")
+#g<-flextable::as_flextable(gamm.mod_Shannon_sevfreq$gam)
+#save_as_docx(g, path ="C:/Users/ruths/Documents/PhD Bern/Data/PhD Bern/Microbiome/Microbiome Project Kat/R/Results/gammSDI_sevfreq.docx" )
+
+data_CF$fitShannon<-predict(gamm.mod_Shannon_sevfreq$gam)
+
+
+gamm.mod_Shannon_sevfreq2 <- gamm(Shannon ~ sev_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_sevsymptoms,na.action=na.omit)
+
+summary(gamm.mod_Shannon_sevfreq2$gam)
+
+data_CF_sevsymptoms$fitShannon<-predict(gamm.mod_Shannon_sevfreq2$gam)
+
+### ONLY BEFORE FIRST SYMPTOMS OCCURR
+
+data_CF_symptoms_before<-data_CF_symptoms %>% 
+  filter(era_symptom=="Before")
+###Means for Shannon
+data_CF_often<-data_CF_symptoms_before %>% 
+  filter(sev_freq=="often")
+summary(data_CF_often$Shannon)
+
+data_cf_normal<-data_CF_symptoms_before %>% 
+  filter(sev_freq=="normal")
+summary(data_cf_normal$Shannon)
+
+gamm.mod_Shannon_sympt.before <- gamm(Shannon ~ sev_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                        family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_symptoms_before,na.action=na.omit)
+
+summary(gamm.mod_Shannon_sympt.before$gam)
+intervals(gamm.mod_Shannon_sympt.before$lme)
+
+
+```
+
+```{r plot Shannon severe symptom freq CF, echo=FALSE, message=FALSE}
+
+p<-ggplot(data_CF, aes(x=ns_week, y=fitShannon, col=sev_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="LRTI")
+p
+
+q<-ggplot(data_CF, aes(x=ns_week, y=Shannon, col=sev_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="LRTI")
+
+r<-ggplot(data_CF, aes(x=ns_week, y=Shannon, col=ab_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="LRTI")
+
+data_CF_sevsymptoms$sev_freq<-factor(data_CF_sevsymptoms$sev_freq,labels = c("lower number","higher number"))
+
+s<-ggplot(data_CF_sevsymptoms, aes(x=time_firstsevsymptom, y=fitShannon, col=sev_freq))+ 
+  geom_smooth()+
+  theme_bw()+
+  geom_point(aes(x=time_firstsevsymptom, y=fitShannon, col=era_sevsymptom),alpha=0.3,show.legend = "none")+
+  labs(x="Time to first LRTI",y="Within sample diversity (fitShannon)",col="LRTI")
+s
+
+data_CF_sevsymptoms %>%filter(!era_sevsymptom=="At") %>% ggplot(aes(x=ns_week, y=fitShannon, col=sev_freq))+ geom_smooth() + theme_bw()+geom_point(alpha=0.5)+facet_grid(~era_sevsymptom)+labs(x="Age (weeks)",col="Severe Symptoms")
+
+data_CF_sevsymptoms %>% filter(ab_freq!="never") %>% 
+ggplot(aes(x=time_firstab, y=fitShannon, col=sev_freq))+ geom_smooth() + theme_bw()+geom_point(aes(x=time_firstab, y=fitShannon, col=era_sevsymptom,alpha=0.1),show.legend = FALSE)+labs(x="Time to first antibiotic Week",col="Severe Symptoms")
+```
+
+**Effect is stronger.**
+
+
+c) Influence of mild symptom frequency?
+
+```{r gamm Shannon mild symptom frequency CF , echo= FALSE}
+
+gamm.mod_Shannon_CF <- gamm(Shannon ~ mild_frequency +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF,na.action=na.omit)
+
+summary(gamm.mod_Shannon_CF$gam)
+
+
+```
+
+```{r gamm Shannon mild symptom freq CF , echo= FALSE}
+
+gamm.mod_Shannon_CF <- gamm(Shannon ~ mild_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF,na.action=na.omit)
+
+summary(gamm.mod_Shannon_CF$gam)
+
+```
+**No difference for mild symptoms**
+
+#
+#
+
+## 2.2. Healthy infants
+## 2.2.1. Shannon Diversity Index
+
+a) Influence of frequency of any symptoms on Shannon in healthy
+
+```{r gamm Shannon symptom frequency healthy , echo= FALSE}
+
+gamm.mod_Shannon_freq <- gamm(Shannon ~ symptom_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_healthy,na.action=na.omit)
+
+summary(gamm.mod_Shannon_freq$gam)
+data_healthy$fitShannon<-predict(gamm.mod_Shannon_freq$gam)
+
+```
+
+**No significant correlation**
+
+```{r plot Shannon symptom frequency healthy, echo=FALSE, message=FALSE}
+
+ggplot(data_healthy, aes(x=ns_week, y=fitShannon, col=symptom_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="Resp. Symptoms")
+
+```
+
+b) Influence of severe symptom frequency?
+
+```{r gamm Shannon severe symptom frequency healthy , echo= FALSE}
+
+gamm.mod_Shannon_healthy <- gamm(Shannon ~ sev_frequency +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_healthy,na.action=na.omit)
+
+summary(gamm.mod_Shannon_healthy$gam)
+
+
+```
+
+```{r gamm Shannon severe symptom freq healthy , echo= FALSE}
+
+gamm.mod_Shannon_healthy <- gamm(Shannon ~ sev_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_healthy,na.action=na.omit)
+
+summary(gamm.mod_Shannon_healthy$gam)
+
+
+```
+
+c) Influence of mild symptom frequency?
+
+```{r gamm Shannon mild symptom freq healthy , echo= FALSE}
+
+gamm.mod_Shannon_healthy <- gamm(Shannon ~ mild_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_healthy,na.action=na.omit)
+
+summary(gamm.mod_Shannon_healthy$gam)
+
+
+```
+
+**No significant correlation on symptom frequency and SDI in healthy infants.**
+
+
+# 3. The role the "first hit" has on the microbiome
+## 3.1. Infants with CF
+## 3.1.1. Shannon Diversity Index
+
+a) Influence of symptomatic era on SDI
+
+```{r gamm Shannon symptom era CF , echo= FALSE}
+
+gamm.mod_Shannon_CF_era <- gamm(Shannon ~ era_symptom +
+                                   s(ns_week, bs="cr",fx=FALSE)+
+                                  as.factor(season)+
+                                  as.factor(bf_atswab)+
+                                  as.factor(ab_atswab)+
+                                  as.factor(patPersSex)+
+                                  as.factor(anf_sibshome),
+                                family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_symptoms,na.action=na.exclude)
+
+summary(gamm.mod_Shannon_CF_era$gam) 
+
+```
+
+**No significant difference in SDI before/ after first symptoms**
+
+
+b) Era of first severe symptoms SDI
+
+```{r gamm Shannon severe symptom era CF , echo= FALSE}
+
+gamm.mod_Shannon_CF_erasev <- gamm(Shannon ~ era_sevsymptom +
+                                  s(ns_week, bs="cr",fx=FALSE)+
+                                  as.factor(season)+
+                                  as.factor(bf_atswab)+
+                                  as.factor(ab_atswab)+
+                                  as.factor(ag_sectio_n)+
+                                  as.factor(patPersSex)+
+                                  as.factor(anf_sibshome),
+                                family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_sevsymptoms,na.action=na.exclude)
+
+summary(gamm.mod_Shannon_CF_erasev$gam) 
+intervals(gamm.mod_Shannon_CF_erasev$lme,which = "fixed")
+
+```
+
+**No significant difference in SDI before/ after first severe symptoms.**
+
+
+## 3.2. Healthy Infants
+## 3.2.1. Shannon Diversity Index
+
+a) Influence of symptomatic era on SDI
+
+```{r gamm Shannon symptom era healthy , echo= FALSE}
+
+gamm.mod_Shannon_healthy_era <- gamm(Shannon ~ era_symptom +
+                                  s(ns_week, bs="cr",fx=FALSE)+
+                                  as.factor(season)+
+                                  as.factor(bf_atswab)+
+                                  as.factor(ab_atswab)+
+                                  as.factor(patPersSex)+
+                                  as.factor(anf_sibshome),
+                                family=gaussian,correlation=corAR1(form=~1|uid),data=data_healthy_symptoms,na.action=na.exclude)
+
+summary(gamm.mod_Shannon_healthy_era$gam) 
+
+```
+
+**No significant difference in SDI before/ after first symptoms**
+
+
+b) Era of first severe symptoms SDI
+
+```{r gamm Shannon severe symptom era healthy , echo= FALSE}
+
+gamm.mod_Shannon_healthy_erasev <- gamm(Shannon ~ era_sevsymptom +
+                                  s(ns_week, bs="cr",fx=FALSE)+
+                                  as.factor(season)+
+                                  as.factor(bf_atswab)+
+                                  as.factor(ab_atswab)+
+                                  as.factor(patPersSex)+
+                                  as.factor(anf_sibshome),
+                                family=gaussian,correlation=corAR1(form=~1|uid),data=data_healthy_sevsymptoms,na.action=na.exclude)
+
+summary(gamm.mod_Shannon_healthy_erasev$gam) 
+
+```
+
+**No significant difference in SDI before/ after first severe symptoms.**
+
+# 5. Detailed analysis of influence antibiotics might have
+
+## 5.1. Development of Shannon diversity in infants treated with antibiotics
+
+a) How does antibiotic treatment influence SDI in infants with CF?
+
+```{r gamm Shannon antibiotic era CF , echo= FALSE}
+
+summary(data_CF_ab$era_ab)
+gamm.mod_Shannon_ab <- gamm(Shannon ~ era_ab +
+                                  s(ns_week, bs="cr",fx=FALSE)+
+                                  as.factor(season)+
+                                  as.factor(bf_atswab)+
+                                  as.factor(ag_sectio_n)+
+                                  as.factor(patPersSex)+
+                                  as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab,na.action=na.omit)
+
+summary(gamm.mod_Shannon_ab$gam) 
+intervals(gamm.mod_Shannon_ab$lme)
+
+```
+
+**After use of antibiotics (era_ab==After) SDI is significantly higher if I do not correct for ab_atswab.**
+
+```{r gamm Shannon antibiotic era CF corrected , echo= FALSE}
+
+gamm.mod_Shannon_ab <- gamm(Shannon ~ era_ab +
+                                  s(ns_week, bs="cr",fx=FALSE)+
+                                  as.factor(season)+
+                                  as.factor(bf_atswab)+
+                                  as.factor(ab_atswab)+
+                                  as.factor(ag_sectio_n)+
+                                  as.factor(patPersSex)+
+                                  as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab,na.action=na.omit)
+
+summary(gamm.mod_Shannon_ab$gam) 
+intervals(gamm.mod_Shannon_ab$lme)
+
+data_CF_ab$fitShannon<-predict(gamm.mod_Shannon_ab$gam)
+
+```
+**If I correct for ab_atswab p is still 0.0158.**
+
+
+
+**What happens if I put symptom frequency in the model?**
+
+```{r gamm Shannon antibiotic era CF corrected frequency , echo= FALSE}
+
+gamm.mod_Shannon_ab <- gamm(Shannon ~ era_ab +
+                                  s(ns_week, bs="cr",fx=FALSE)+
+                                  as.factor(season)+
+                                  as.factor(bf_atswab)+
+                                  as.factor(ab_atswab)+
+                                  as.factor(ag_sectio_n)+
+                                  as.factor(sev_freq)+
+                                  as.factor(patPersSex)+
+                                  as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab,na.action=na.omit)
+
+summary(gamm.mod_Shannon_ab$gam) 
+
+data_CF_ab$fitShannon<-predict(gamm.mod_Shannon_ab$gam)
+
+```
+
+**What happens if I look at symptom frequency often only in the model?**
+
+```{r gamm Shannon antibiotic era CF often corrected , echo= FALSE}
+
+data_CF_ab_only<-data_CF_ab %>% 
+  filter(sev_freq=="often")
+
+gamm.mod_Shannon_ab <- gamm(Shannon ~ era_ab +
+                                  s(ns_week, bs="cr",fx=FALSE)+
+                                  as.factor(season)+
+                                  as.factor(bf_atswab)+
+                                  as.factor(ab_atswab)+
+                                  as.factor(patPersSex)+
+                                  as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab_only,na.action=na.omit)
+
+summary(gamm.mod_Shannon_ab$gam)
+```
+
+
+```{r plot antibiotics in CF, echo=FALSE, message=FALSE}
+
+p<-ggplot(data_CF_ab, aes(x=time_firstab*2, y=fitShannon, col=era_ab)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Time to first antibiotic treatment (weeks)",col="Antibiotic treatment")+  ylab(expression(paste(alpha)-diversity))
+p
+#ggsave("20231029_ab.tiff",width = 19, height = 14,units = "cm")
+#ggsave("20231029_ab.jpg",width = 19, height = 14,units = "cm")
+#ggsave("20240624_ab.pdf",width = 18, height = 12,units = "cm",dpi = 300)
+
+
+ggplot(data_CF_ab, aes(x=ns_week, y=fitShannon, col=era_ab)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age in weeks",col="First antibiotics")
+
+p<-ggplot(data_CF_ab, aes(x=time_firstab, y=fitShannon, col=sev_freq)) + geom_smooth() + theme_bw()  + geom_point(aes(x=time_firstab, y=fitShannon, col=era_ab),alpha=0.3)+labs(x="Time to first antibiotic treatment",col="LRTI",y="")
+p
+
+ggplot(data_CF_ab, aes(x=time_firstab, y=fitShannon, col=symptom_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Time to antibiotic treatment",col="Any symptoms")
+
+```
+
+The n of the antibiotic group is rather small (33 infants)
+
+b) Do the effects of Shannon ~ Symptom Frequency also appear in infants with regularly antibiotic treatment vs infants with never antibiotics?
+
+Start with any symptoms
+
+```{r gamm Shannon symptom frequency CF_ab , echo= FALSE}
+
+gamm.mod_Shannon_freq <- gamm(Shannon ~ symptom_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+ ###here I correct for ab at swab
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab,na.action=na.omit)
+
+summary(gamm.mod_Shannon_freq$gam)
+data_CF_ab$fitShannon<-predict(gamm.mod_Shannon_freq$gam)
+
+```
+
+**CF_ab Infants with many infections have lower SDI. I still corrected for ab_atswab**
+
+
+```{r plot Shannon symptom frequency CF_ab, echo=FALSE, message=FALSE}
+
+ggplot(data_CF_ab, aes(x=ns_week, y=fitShannon, col=symptom_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="Resp. Symptoms")
+
+```
+
+c) Influence of severe symptom frequency in infants with antibiotics?
+
+Combining often+sometimes und never+rarely
+
+```{r gamm Shannon severe symptom freq CF_ab , echo= FALSE}
+
+gamm.mod_Shannon_sevfreq <- gamm(Shannon ~ sev_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab,na.action=na.omit)
+
+summary(gamm.mod_Shannon_sevfreq$gam)
+
+data_CF_ab$fitShannon<-predict(gamm.mod_Shannon_sevfreq$gam)
+
+```
+
+```{r plot Shannon severe symptom freq CF_ab, echo=FALSE, message=FALSE}
+
+ggplot(data_CF_ab, aes(x=ns_week, y=fitShannon, col=sev_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="Severe Symptoms")
+
+```
+
+**Effect is same.**
+
+
+d) Influence of mild symptom frequency?
+
+```{r gamm Shannon mild symptom freq CF_ab , echo= FALSE}
+
+gamm.mod_Shannon_CF_ab <- gamm(Shannon ~ mild_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab,na.action=na.omit)
+
+summary(gamm.mod_Shannon_CF_ab$gam)
+
+```
+**No difference for mild symptoms. Same same.**
+
+e) What about infants with never antibiotics? Start with any symptoms.
+
+```{r gamm Shannon symptom frequency CF_noab , echo= FALSE}
+
+gamm.mod_Shannon_freq <- gamm(Shannon ~ symptom_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_noab,na.action=na.omit)
+
+summary(gamm.mod_Shannon_freq$gam)
+data_CF_noab$fitShannon<-predict(gamm.mod_Shannon_freq$gam)
+
+```
+
+**CF_noab Infants with many infections do not have lower SDI.**
+
+
+```{r plot Shannon symptom frequency CF_noab, echo=FALSE, message=FALSE}
+
+ggplot(data_CF_noab, aes(x=ns_week, y=fitShannon, col=symptom_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="Resp. Symptoms")
+
+```
+
+f) Influence of severe symptom frequency in infants with never antibiotics?
+
+Combining often+sometimes und never+rarely
+
+```{r gamm Shannon severe symptom freq CF_noab , echo= FALSE}
+
+summary(data_CF_noab$sev_freq)
+gamm.mod_Shannon_sevfreq <- gamm(Shannon ~ sev_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_noab,na.action=na.omit)
+
+summary(gamm.mod_Shannon_sevfreq$gam)
+
+data_CF_noab$fitShannon<-predict(gamm.mod_Shannon_sevfreq$gam)
+
+```
+
+```{r plot Shannon severe symptom freq CF_noab, echo=FALSE, message=FALSE}
+
+ggplot(data_CF_noab, aes(x=ns_week, y=fitShannon, col=sev_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="Severe Symptoms")
+
+```
+
+**Effect here is same same.**
+
+g) Shannon diversity and frequency of severe symptoms in ab naive CF infants?
+
+```{r gamm Shannon severe symptom freq CF_abnaive , echo= FALSE}
+
+summary(data_CF_noab$sev_freq)
+data_CF_naive<-data_new_abnaive %>%
+  filter(CF=="CF")
+summary(data_CF_naive$sev_freq)
+
+###Means for Shannon
+data_CF_often<-data_CF_naive %>% 
+  filter(sev_freq=="often")
+summary(data_CF_often$Shannon)
+
+data_cf_normal<-data_CF_naive %>% 
+  filter(sev_freq=="normal")
+summary(data_cf_normal$Shannon)
+
+summary(glm(Shannon~sev_freq,data = data_CF_naive))
+lme_sev<-lme(Shannon~sev_freq, random= ~ns_week|uid,data = data_CF_naive)
+anova(lme_sev)
+summary(lme_sev)
+intervals(lme_sev)
+
+gamm.mod_Shannon_sevfreq <- gamm(Shannon ~ sev_freq +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid ),data=data_CF_naive,na.action=na.omit)
+
+summary(gamm.mod_Shannon_sevfreq$gam)
+intervals(gamm.mod_Shannon_sevfreq$lme,which = "fixed")
+g<-flextable::as_flextable(gamm.mod_Shannon_sevfreq$gam)
+#flextable::save_as_docx(g, path ="C:/Users/ruths/Documents/PhD Bern/Data/PhD Bern/Microbiome/Microbiome Project Kat/R/Results/gammSDI_sevfreq_naive.docx" )
+
+data_CF_naive$fitShannon<-predict(gamm.mod_Shannon_sevfreq$gam)
+
+```
+
+```{r plot ab naive, echo=FALSE }
+
+
+p<-ggplot(data_CF_naive, aes(x=ns_week, y=fitShannon, col=sev_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="LRTI frequency")+ylim(1,3)
+p
+q<-ggplot(data_CF, aes(x=ns_week, y=fitShannon, col=sev_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="LRTI frequency")+ylim(1,3)
+q
+cow<-cowplot::plot_grid(q,p,nrow = 2,labels = "AUTO")
+
+r<-ggplot(data_CF, aes(x=ns_week, y=Shannon, col=ab_freq)) + geom_smooth() + theme_bw()  + geom_point(alpha=0.3)+labs(x="Age (weeks)",col="LRTI") 
+
+``` 
+
+
+h) What happens after antibiotic treatment? Shannon still affected by antibiotics?
+
+```{r gamm Shannon after antibiotics only , echo= FALSE}
+
+data_CF_ab_after<-data_CF_ab %>% 
+  filter(era_ab=="After")#394 swabs
+gamm.mod_Shannon_afterab <- gamm(Shannon ~ s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab_after,na.action=na.omit)
+
+summary(gamm.mod_Shannon_afterab$gam)
+intervals(gamm.mod_Shannon_afterab$lme,which = "fixed")
+
+```
+If I only look after first ab, antibiotic at swab does not increase SDI significantly any longer, but only 394 swabs.
+
+What if I compare the time before second ab and after?
+```{r gamm Shannon after second antibiotic , echo= FALSE}
+
+data_CF_ab_2<-data_CF_ab %>% 
+  arrange(ns_week) %>%
+  filter(era_ab=="After") %>% 
+  dplyr::mutate(time_secondab = max(ab_atswab[-which.max(ab_atswab)])+1)#
+  #mutate(era_ab2=ifelse(time_firstab< 2,"Before","After"))
+data_CF_ab_2$era_ab2<-as.factor(data_CF_ab_2$era_ab2)
+gamm.mod_Shannon_era2 <- gamm(Shannon ~ era_ab2+
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(bf_atswab)+
+                              #as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab_2,na.action=na.omit)
+
+summary(gamm.mod_Shannon_era2$gam)
+
+```
+
+Next, try to make three groups: before_ab, after1,after2
+```{r gamm Shannon groups, echo= FALSE}
+
+data_CF_ab_2<-data_CF_ab %>% 
+  mutate(era_ab2=ifelse(time_firstab< 2,"Before","After")) %>% 
+  mutate(ab_group=ifelse(time_firstab<1,"Before",ifelse(time_firstab>2,"After2","After1")))
+data_CF_ab_2$era_ab2<-as.factor(data_CF_ab_2$era_ab2)
+gamm.mod_Shannon_era2 <- gamm(Shannon ~ era_ab2+
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(bf_atswab)+
+                              #as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF_ab_2,na.action=na.omit)
+
+summary(gamm.mod_Shannon_era2$gam)
+
+```
+
+```{r gamm Shannon antibiotic frequency , echo= FALSE}
+
+gamm.mod_Shannon_n_ab <- gamm(Shannon ~ n_ab_atswab+
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(bf_atswab)+
+                              #as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF,na.action=na.omit)
+
+summary(gamm.mod_Shannon_n_ab$gam)
+
+gamm.mod_Shannon_ab_freq <- gamm(Shannon ~ ab_freq+
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(bf_atswab)+
+                              as.factor(ab_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid),data=data_CF,na.action=na.omit)
+
+summary(gamm.mod_Shannon_ab_freq$gam)
+```
+i) Is SDI different between CF and healthy before first antibiotic and before LRTI?
+
+```{r gamm Shannon CF vs Healthy before AB/LRTI , echo= FALSE}
+gamm.mod_Shannon_beforenaive <- gamm(Shannon ~ CF +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid ),data=data_new_naivebeforesev,na.action=na.omit)
+
+summary(gamm.mod_Shannon_beforenaive$gam)
+intervals(gamm.mod_Shannon_beforenaive$lme,which = "fixed")
+g<-flextable::as_flextable(gamm.mod_Shannon_sevfreq$gam)
+
+data_CF_naive$fitShannon<-predict(gamm.mod_Shannon_sevfreq$gam)
+```
+**No difference between CF and healthy before ab and before LRTI**
+
+j) What about before AB and after LRTI?
+```{r gamm Shannon CF vs Healthy AB naive/after LRTI , echo= FALSE}
+data_new_aftersevnaive<-data_new_sevsymptoms %>% 
+  filter(era_sevsymptom=="After") %>% 
+  filter(Subject%in%data_new_abnaive$Subject) #only 39 infants with 297 swabs
+
+gamm.mod_Shannon_afternaive <- gamm(Shannon ~ CF +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(ag_sectio_n)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid ),data=data_new_aftersevnaive,na.action=na.omit)
+
+summary(gamm.mod_Shannon_afternaive$gam)
+intervals(gamm.mod_Shannon_afternaive$lme,which = "fixed")
+data_new_aftersevnaive_cf<-data_new_aftersevnaive %>% 
+  filter(CF=="CF")
+summary(data_new_aftersevnaive_cf$Shannon)
+data_new_aftersevnaive_healthy<-data_new_aftersevnaive %>% 
+  filter(CF=="Healthy")
+summary(data_new_aftersevnaive_healthy$Shannon)
+```
+**No difference between CF and healthy.**
+
+k)What about after AB and before symptoms?
+
+```{r gamm Shannon CF vs Healthy after AB/no LRTI , echo= FALSE}
+
+data_new_beforesevab<-data_new_ab %>% 
+  filter(era_ab=="After") %>% 
+  filter(Subject%in%data_new_beforesev$Subject) #13 CF with 75 samples
+data_beforesevab<-full_join(data_beforesev_Healthy,data_new_beforesevab)
+
+gamm.mod_Shannon_beforesevab <- gamm(Shannon ~ CF +
+                              s(ns_week, bs="cr",fx=FALSE)+
+                              as.factor(season)+
+                              as.factor(bf_atswab)+
+                              as.factor(patPersSex)+
+                              as.factor(ag_sectio_n)+
+                              #as.factor(ab_atswab)+
+                              as.factor(anf_sibshome),
+                            family=gaussian,correlation=corAR1(form=~1|uid ),data=data_beforesevab,na.action=na.omit)
+
+summary(gamm.mod_Shannon_beforesevab$gam)
+intervals(gamm.mod_Shannon_beforesevab$lme,which = "fixed")
+summary(data_new_beforesevab$Shannon)
+
+```
+**Comparing before first LRTI but after antibiotics gives Healthy C -0.383 p=0.0196**
